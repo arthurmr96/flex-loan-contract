@@ -27,6 +27,7 @@ contract LoanVault {
   }
 
   uint256 public lockedAmount;
+  uint256 public lendedAmount;
   mapping(address => Loan) public loans;
   uint256 internal lendersCount;
   uint256 internal loansCount;
@@ -79,6 +80,7 @@ contract LoanVault {
     lendersBalance[msg.sender] += msg.value;
     lenders[lendersCount] = msg.sender;
     lockedAmount += msg.value;
+    lendedAmount += msg.value;
     lendersCount += 1;
 
     emit Lend(msg.sender, msg.value, block.timestamp);
@@ -89,7 +91,7 @@ contract LoanVault {
       return 0;
     }
 
-    uint256 participation = lendersBalance[_lender] / lockedAmount;
+    uint256 participation = lendersBalance[_lender] / lendedAmount;
     uint256 amount = lockedAmount * participation;
 
     return amount;
