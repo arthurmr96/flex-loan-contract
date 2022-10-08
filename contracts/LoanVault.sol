@@ -139,6 +139,7 @@ contract LoanVault {
     address azuki = 0x9F6d70CDf08d893f0063742b51d3E9D1e18b7f74;
     bool isBlockie = _collateralTargetAddress == 0x46bEF163D6C470a4774f9585F3500Ae3b642e751;
 
+    // If the collateral is a blockie, we use the Azuki's price feed (10% of the floor price)
     nftFloorPriceFeed = AggregatorV3Interface(isBlockie ? azuki : _collateralTargetAddress);
     (, int256 price, , , ) = nftFloorPriceFeed.latestRoundData();
     require(price > 0, "NFT floor price should be greater than 0");
