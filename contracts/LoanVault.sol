@@ -31,7 +31,7 @@ contract LoanVault {
   mapping(address => Loan) public loans;
   uint256 internal lendersCount;
   uint256 internal loansCount;
-  mapping(uint256 => address) public loansBorrowers;
+  mapping(uint256 => address) internal loansBorrowers;
   mapping(uint256 => address) public lenders;
   mapping(address => uint256) public lendersBalance;
   AggregatorV3Interface internal nftFloorPriceFeed;
