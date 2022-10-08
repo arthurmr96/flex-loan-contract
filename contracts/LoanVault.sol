@@ -135,12 +135,13 @@ contract LoanVault {
     );
 
     address azuki = 0x9F6d70CDf08d893f0063742b51d3E9D1e18b7f74;
+    bool isBlockie = _collateralTargetAddress == 0x46bEF163D6C470a4774f9585F3500Ae3b642e751;
 
-    nftFloorPriceFeed = AggregatorV3Interface(azuki);
+    nftFloorPriceFeed = AggregatorV3Interface(isBlockie ? azuki : _collateralTargetAddress);
     (, int256 price, , , ) = nftFloorPriceFeed.latestRoundData();
     require(price > 0, "NFT floor price should be greater than 0");
 
-    uint256 fullAmount = _collateralTargetAddress != azuki ? uint256(price / 100) : uint256(price);
+    uint256 fullAmount = isBlockie ? uint256(price / 100) : uint256(price);
     uint256 amount = fullAmount * 60 / 100;
     require(address(this).balance >= amount, "Insufficient liquidity in the vault");
 
@@ -222,13 +223,17 @@ contract LoanVault {
     }
   }
 
-  function getLatestPrice(address _collectionAddress) external view returns (
+  function collectionPrice(address _collectionAddress) external view returns (
     uint80 roundId,
     int256 answer,
     uint256 startedAt,
     uint256 updatedAt,
     uint80 answeredInRound
   ) {
+    if (_collectionAddress == "0x46bEF163D6C470a4774f9585F3500Ae3b642e751") {
+      return AggregatorV3Interface(0x9F6d70CDf08d893f0063742b51d3E9D1e18b7f74).latestRoundData();
+    }
+
     return AggregatorV3Interface(_collectionAddress).latestRoundData();
   }
 }
