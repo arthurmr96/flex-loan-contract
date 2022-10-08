@@ -213,7 +213,7 @@ contract LoanVault {
       bool isActive = loans[borrower].timestamp + loans[borrower].duration < block.timestamp
         && loans[borrower].amount > 0;
       if (isActive) {
-        Loan memory foundLoan = loans[borrower];
+        Loan storage foundLoan = loans[borrower];
         foundLoan.status = "liquidated";
         foundLoan.liquidatedAmount = foundLoan.amount;
         foundLoan.amount = 0;
@@ -230,7 +230,7 @@ contract LoanVault {
     uint256 updatedAt,
     uint80 answeredInRound
   ) {
-    if (_collectionAddress == "0x46bEF163D6C470a4774f9585F3500Ae3b642e751") {
+    if (_collectionAddress == 0x46bEF163D6C470a4774f9585F3500Ae3b642e751) {
       return AggregatorV3Interface(0x9F6d70CDf08d893f0063742b51d3E9D1e18b7f74).latestRoundData();
     }
 

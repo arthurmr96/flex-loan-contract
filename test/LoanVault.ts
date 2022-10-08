@@ -162,5 +162,33 @@ describe("LoanVault", function () {
             }
             execute().then(done, done);
         });
+
+        it('should liquidate loan that expired', function (done) {
+            const execute = async () => {
+                const { loanVault, accountOne } = await loadFixture(deployLoanVaultFixture);
+                loanVault.lend({ value: ethers.utils.parseEther('1') })
+                const updatedVault = loanVault.connect(accountOne)
+                await generateFaucet(blockie, accountOne)
+                const tokenId = await getNftCollectionItem(blockie, accountOne)
+                await approveErc721(blockie, accountOne, loanVault.address, tokenId)
+                await updatedVault.loan(blockie, tokenId, 30, 3)
+
+                await ethers.provider.send("evm_increaseTime", [3600])
+                await ethers.provider.send("evm_mine", [])
+
+                await updatedVault.liquidateLoans()
+
+                const afterExpire = await loanVault.currentPayback(accountOne.address)
+                const afterExpireAmountUint256 = afterExpire.amount
+                const updatedLoan = await loanVault.loans(accountOne.address)
+                const updatedLoanAmount = updatedLoan.amount
+                const updatedLoanLiquidatedAmount = updatedLoan.liquidatedAmount
+
+                expect(Number(afterExpireAmountUint256.toString())).equal(0);
+                expect(Number(updatedLoanAmount.toString())).equal(0);
+                expect(Number(updatedLoanLiquidatedAmount.toString())).greaterThan(0);
+            }
+            execute().then(done, done);
+        });
     });
 });
