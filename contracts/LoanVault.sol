@@ -6,15 +6,14 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {SafeERC721} from "./SafeERC721.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 
-contract LoanVault {
-  using SafeERC721 for IERC721;
-
   struct LoanPaybackData {
+    uint256 index;
     uint256 amount;
     uint256 timestamp;
   }
 
   struct Loan {
+    uint256 index;
     address borrower;
     address target;
     uint256 tokenId;
@@ -26,18 +25,25 @@ contract LoanVault {
     string status;
   }
 
+contract LoanVault {
+  using SafeERC721 for IERC721;
+
   address public owner;
+
+  mapping(address => uint256) public borrowersBalance;
+  mapping(uint256 => Loan) public loans;
+  uint256 public loansCount;
   uint256 public lockedAmount;
-  uint256 public lendedAmount;
-  mapping(address => Loan) public loans;
-  uint256 internal lendersCount;
-  uint256 internal loansCount;
-  mapping(uint256 => address) internal loansBorrowers;
+
   mapping(uint256 => address) public lenders;
   mapping(address => uint256) public lendersBalance;
+  uint256 public lendersCount;
+  uint256 public lendedAmount;
+
   AggregatorV3Interface internal nftFloorPriceFeed;
 
   event LoanCreation(
+    uint index,
     address borrower,
     address collateralTargetAddress,
     uint256 collateralTargetTokenId,
@@ -48,12 +54,14 @@ contract LoanVault {
   );
 
   event LoanPayback(
+    uint256 index,
     address borrower,
     uint256 amount,
     uint256 timestamp
   );
 
   event LoanLiquidation(
+    uint256 index,
     address borrower,
     uint256 amount,
     uint256 timestamp
@@ -106,6 +114,8 @@ contract LoanVault {
   function ownerExit() public {
     require(msg.sender == owner, "Only owner can exit");
     payable(owner).transfer(address(this).balance);
+
+    lockedAmount = 0;
   }
 
   function withdraw() public {
@@ -121,6 +131,18 @@ contract LoanVault {
     lockedAmount -= amount;
 
     emit Withdraw(msg.sender, amount, block.timestamp);
+  }
+
+  function borrowerLoans(address _borrower) public view returns (Loan[] memory) {
+    Loan[] memory _borrowerLoans = new Loan[](loansCount);
+
+    for (uint256 i = 0; i < loansCount; i++) {
+      if (keccak256(abi.encodePacked(loans[i].borrower)) == keccak256(abi.encodePacked(_borrower))) {
+        _borrowerLoans[i] = loans[i];
+      }
+    }
+
+    return _borrowerLoans;
   }
 
   function loan(
@@ -159,13 +181,15 @@ contract LoanVault {
       require(amount >= 0, "Loan amount should be greater than 0");
       require((lockedAmount -= amount) >= 0, "Insufficient liquidity on vault");
       lockedAmount -= amount;
+      borrowersBalance[msg.sender] += amount;
     }
 
     IERC721(_collateralTargetAddress).transferFrom(msg.sender, address(this), _collateralTargetTokenId);
     bool sendSuccessful = payable(msg.sender).send(amount);
     require(sendSuccessful, "Transfer failed");
-    loansBorrowers[loansCount++] = msg.sender;
-    loans[msg.sender] = Loan(
+    uint256 index = loansCount++;
+    loans[index] = Loan(
+      index,
       msg.sender,
       _collateralTargetAddress,
       _collateralTargetTokenId,
@@ -178,6 +202,7 @@ contract LoanVault {
     );
 
     emit LoanCreation(
+      index,
       msg.sender,
       _collateralTargetAddress,
       _collateralTargetTokenId,
@@ -188,47 +213,55 @@ contract LoanVault {
     );
   }
 
-  function currentPayback(address _borrower) public view returns (LoanPaybackData memory) {
-    if (loans[_borrower].amount == 0) {
-      return LoanPaybackData(0, 0);
+  function currentPayback(uint256 _index) public view returns (LoanPaybackData memory) {
+    if (loans[_index].amount == 0) {
+      return LoanPaybackData(0, 0, 0);
     }
 
-    Loan storage foundLoan = loans[_borrower];
+    Loan storage foundLoan = loans[_index];
     uint256 interest = (foundLoan.amount * foundLoan.interestRate * (block.timestamp - foundLoan.timestamp)) / 100 / 365;
-    return LoanPaybackData(foundLoan.amount + interest, block.timestamp);
+    return LoanPaybackData(_index, foundLoan.amount + interest, block.timestamp);
   }
 
-  function payback(uint256 timestamp) payable public {
-    require(loans[msg.sender].amount > 0, "You don't have a loan");
-    require(loans[msg.sender].timestamp + loans[msg.sender].duration < timestamp, "Loan is not expired");
+  function payback(uint256 loanId, uint256 timestamp) payable public {
+    require(loans[loanId].amount > 0, "You don't have a loan");
+    require(loans[loanId].timestamp + (loans[loanId].duration) > timestamp, "Loan is expired");
 
-    Loan storage foundLoan = loans[msg.sender];
+    Loan storage foundLoan = loans[loanId];
     uint256 interest = (foundLoan.amount * foundLoan.interestRate * (timestamp - foundLoan.timestamp)) / 100 / 365;
     uint256 totalAmount = foundLoan.amount + interest;
 
     require(totalAmount > 0, "You don't have any balance to be paid back");
     require(totalAmount <= msg.value, "You're not sending enough tokens to payback the loan");
 
-    lockedAmount += totalAmount;
+    unchecked {
+      require(borrowersBalance[msg.sender] > 0, "Borrower's debt should be greater than 0");
+      require(totalAmount > 0, "You don't have any balance to be paid back");
+      require(totalAmount <= msg.value, "You're not sending enough tokens to payback the loan");
+      lockedAmount += totalAmount;
+      borrowersBalance[msg.sender] -= totalAmount;
+    }
+
     foundLoan.status = "paid";
     foundLoan.amount = 0;
 
-    emit LoanPayback(msg.sender, totalAmount, block.timestamp);
+    emit LoanPayback(foundLoan.index, msg.sender, totalAmount, block.timestamp);
   }
 
   function liquidateLoans() external {
     require(loansCount > 0, "There are no loans to liquidate");
     for (uint256 i = 0; i < loansCount; i++) {
-      address borrower = loansBorrowers[i];
-      bool isActive = loans[borrower].timestamp + loans[borrower].duration < block.timestamp
-        && loans[borrower].amount > 0;
+
+      bool isActive = loans[i].timestamp + loans[i].duration < block.timestamp
+        && loans[i].amount > 0;
       if (isActive) {
-        Loan storage foundLoan = loans[borrower];
+        Loan storage foundLoan = loans[i];
         foundLoan.status = "liquidated";
         foundLoan.liquidatedAmount = foundLoan.amount;
         foundLoan.amount = 0;
+        borrowersBalance[foundLoan.borrower] -= foundLoan.liquidatedAmount;
 
-        emit LoanLiquidation(borrower, foundLoan.liquidatedAmount, block.timestamp);
+        emit LoanLiquidation(i, foundLoan.borrower, foundLoan.liquidatedAmount, block.timestamp);
       }
     }
   }
