@@ -96,17 +96,6 @@ contract LoanVault {
     emit Lend(msg.sender, msg.value, block.timestamp);
   }
 
-  function withdrawalAmount(address _lender) public view returns (uint256) {
-    if (lendersBalance[_lender] == 0) {
-      return 0;
-    }
-
-    uint256 participation = lendersBalance[_lender] / lendedAmount;
-    uint256 amount = lockedAmount * participation;
-
-    return amount;
-  }
-
   function balance() public view returns (uint256) {
     return address(this).balance;
   }
@@ -121,7 +110,7 @@ contract LoanVault {
   function withdraw() public {
     require(lendersBalance[msg.sender] > 0, "You don't have any balance to claim");
 
-    uint256 amount = withdrawalAmount(msg.sender);
+    uint256 amount = lendersBalance[msg.sender];
     require(amount > 0, "You don't have any balance to withdraw");
     require(amount <= address(this).balance, "Not enough balance in the contract");
 
@@ -129,6 +118,7 @@ contract LoanVault {
     require(sendSuccessful, "Transfer failed");
     lendersBalance[msg.sender] = 0;
     lockedAmount -= amount;
+    lendedAmount -= amount;
 
     emit Withdraw(msg.sender, amount, block.timestamp);
   }
