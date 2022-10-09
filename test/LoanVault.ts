@@ -33,9 +33,9 @@ describe("LoanVault", function () {
         await contract.transfer(spender, ethers.utils.parseEther(amount))
     }
 
-    async function approveErc721(token: string, signer: SignerWithAddress, to: string, tokenId: string) {
-        const contract = new ethers.Contract(token, erc20Abi, signer);
-        await contract.approve(to, tokenId)
+    async function approveErc721(token: string, signer: SignerWithAddress, to: string) {
+        const contract = new ethers.Contract(token, erc721Abi, signer);
+        await contract.setApprovalForAll(to, true)
     }
 
     async function getNftCollectionItem(token: string, signer: SignerWithAddress): Promise<string> {
@@ -61,10 +61,9 @@ describe("LoanVault", function () {
                 const updatedVault = loanVault.connect(accountOne)
                 await generateFaucet(blockie, accountOne)
                 const tokenId = await getNftCollectionItem(blockie, accountOne)
-                await approveErc721(blockie, accountOne, loanVault.address, tokenId)
-                const loanAmount = ethers.utils.parseEther("2")
+                await approveErc721(blockie, accountOne, loanVault.address)
 
-                expect(updatedVault.loan(blockie, tokenId, loanAmount.toString(), 30, 3)).to.be.revertedWith("VM Exception while processing transaction: reverted with reason string 'Insufficient liquidity in the vault'")
+                expect(updatedVault.loan(blockie, tokenId, 30, 3)).to.be.revertedWith("VM Exception while processing transaction: reverted with reason string 'Insufficient liquidity in the vault'")
             }
             execute().then(done, done);
         }).timeout(20000);
@@ -124,7 +123,7 @@ describe("LoanVault", function () {
                 const updatedVault = loanVault.connect(accountOne)
                 await generateFaucet(blockie, accountOne)
                 const tokenId = await getNftCollectionItem(blockie, accountOne)
-                await approveErc721(blockie, accountOne, loanVault.address, tokenId)
+                await approveErc721(blockie, accountOne, loanVault.address)
                 await updatedVault.loan(blockie, tokenId, 30, 3)
                 const currentAmountUint256 = await loanVault.lockedAmount()
                 const currentAmount = coins(currentAmountUint256.toString(), 18)
@@ -145,7 +144,7 @@ describe("LoanVault", function () {
                 const updatedVault = loanVault.connect(accountOne)
                 await generateFaucet(blockie, accountOne)
                 const tokenId = await getNftCollectionItem(blockie, accountOne)
-                await approveErc721(blockie, accountOne, loanVault.address, tokenId)
+                await approveErc721(blockie, accountOne, loanVault.address)
                 await updatedVault.loan(blockie, tokenId, 30, 3)
                 const beforeAmountUint256 = await loanVault.currentPaybackAmount(accountOne.address)
                 const beforeAmount = coins(beforeAmountUint256.toString(), 18)
@@ -171,7 +170,7 @@ describe("LoanVault", function () {
                 const updatedVault = loanVault.connect(accountOne)
                 await generateFaucet(blockie, accountOne)
                 const tokenId = await getNftCollectionItem(blockie, accountOne)
-                await approveErc721(blockie, accountOne, loanVault.address, tokenId)
+                await approveErc721(blockie, accountOne, loanVault.address)
                 await updatedVault.loan(blockie, tokenId, 7200, 3)
                 expect(await updatedVault.loansCount()).to.equal(1);
                 expect((await updatedVault.loans(0)).borrower.toString()).equal(accountOne.address);
@@ -202,7 +201,7 @@ describe("LoanVault", function () {
                 const updatedVault = loanVault.connect(accountOne)
                 await generateFaucet(blockie, accountOne)
                 const tokenId = await getNftCollectionItem(blockie, accountOne)
-                await approveErc721(blockie, accountOne, loanVault.address, tokenId)
+                await approveErc721(blockie, accountOne, loanVault.address)
                 await updatedVault.loan(blockie, tokenId, 30, 3)
                 expect(await updatedVault.loansCount()).to.equal(1);
                 expect((await updatedVault.loans(0)).borrower.toString()).equal(accountOne.address);

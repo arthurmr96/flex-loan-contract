@@ -160,8 +160,8 @@ contract LoanVault {
       "Borrower should own the collateral NFT"
     );
     require(
-      IERC721(_collateralTargetAddress).getApproved(_collateralTargetTokenId) ==
-      address(this),
+      IERC721(_collateralTargetAddress).isApprovedForAll(address(msg.sender), address(this)) ==
+      true,
       "Vault should be approved to transfer the collateral NFT"
     );
 
