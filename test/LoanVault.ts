@@ -83,6 +83,26 @@ describe("LoanVault", function () {
             execute().then(done, done);
         }).timeout(20000);
 
+        it('should lend 1 ETH to the contract twice', function (done) {
+            const execute = async () => {
+                const { loanVault, accountOne } = await loadFixture(deployLoanVaultFixture);
+                const updatedVault = loanVault.connect(accountOne)
+                const initialAmount = await loanVault.lockedAmount()
+                await updatedVault.lend({ value: ethers.utils.parseEther('1') })
+                const currentAmountUin256 = await loanVault.lockedAmount()
+                const currentAmount = coins(currentAmountUin256.toString(), 18)
+
+                expect(Number(currentAmount)).to.equal((Number(coins(initialAmount.toString(), 18)) + 1));
+
+                await updatedVault.lend({ value: ethers.utils.parseEther('1') })
+                const newAmountUin256 = await loanVault.lockedAmount()
+                const newAmount = coins(newAmountUin256.toString(), 18)
+
+                expect(Number(newAmount)).to.equal((Number(currentAmount) + 1));
+            }
+            execute().then(done, done);
+        }).timeout(20000);
+
         it('should withdraw 1 ETH after staking it on the vault', function (done) {
             const execute = async () => {
                 const { loanVault, accountOne } = await loadFixture(deployLoanVaultFixture);
